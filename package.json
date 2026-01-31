@@ -1,0 +1,12 @@
+{
+  "name": "flutter-localization-action",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Translate Flutter ARB files using Gemini API",
+  "main": "index.js",
+  "scripts": {},
+  "dependencies": {
+    "axios": "^1.13.4",
+    "node-fetch": "^3.3.2"
+  }
+}
