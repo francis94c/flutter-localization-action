@@ -1,6 +1,9 @@
 name: "Flutter Localization Action using Gemini"
 description: "Translates a Flutter ARB file to another language using Gemini API."
 author: "Francis Ilechukwu"
+branding:
+  icon: globe
+  color: blue
 inputs:
   source_file:
     description: "Path to the source ARB file (English)."
