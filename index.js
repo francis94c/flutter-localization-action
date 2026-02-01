@@ -46,13 +46,13 @@ async function translateBatch(batch, targetLangCode, apiKey, batchNumber, totalB
         contents: [
           {
             parts: [{
-              text: `Translate the following English texts to language code '${targetLangCode}' as a JSON array: ${JSON.stringify(batch)}. respond with just the array, no extra strings, no formatting.`
+              text: `Translate the following English texts to language code '${targetLangCode}' as a JSON array: ${JSON.stringify(batch)}. respond with just the array, no extra strings, no formatting, leave anything inside a curly braces in the original language.`,
             }],
           },
         ],
       },
       {
-        timeout: 30000, // 30 second timeout
+        timeout: 30000,
       }
     );
 
