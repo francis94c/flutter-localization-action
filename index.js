@@ -64,19 +64,75 @@ async function translateBatch(batch, targetLangCode, apiKey, batchNumber, totalB
   }
 }
 
+// Translate to a single target
+async function translateToTarget(sourceFile, targetFile, targetLangCode, apiKey, arbData, originalValues, originalKeys) {
+  console.log(`\nTranslating to ${targetLangCode} → ${targetFile}`);
+
+  // Split into batches
+  const batches = chunkArray(originalValues, BATCH_SIZE);
+  const totalBatches = batches.length;
+
+  if (totalBatches > 1) {
+    console.log(`Processing in ${totalBatches} batches of up to ${BATCH_SIZE} strings each.`);
+  }
+
+  // Translate each batch
+  const allTranslations = [];
+  for (let i = 0; i < batches.length; i++) {
+    const translatedBatch = await translateBatch(
+      batches[i],
+      targetLangCode,
+      apiKey,
+      i + 1,
+      totalBatches
+    );
+    allTranslations.push(...translatedBatch);
+
+    // Small delay between batches to avoid rate limiting
+    if (i < batches.length - 1) {
+      await sleep(500);
+    }
+  }
+
+  console.log(`✓ All ${allTranslations.length} strings translated to ${targetLangCode}!`);
+
+  // Rebuild ARB file
+  const newArb = { ...arbData };
+  originalKeys.forEach((key, index) => {
+    newArb[key] = allTranslations[index];
+  });
+
+  fs.writeFileSync(targetFile, JSON.stringify(newArb, null, 2));
+  console.log(`✓ Created: ${targetFile}`);
+}
+
 async function run() {
   try {
     const sourceFile = process.env.INPUT_SOURCE_FILE;
-    const targetFile = process.env.INPUT_TARGET_FILE;
-    const targetLangCode = process.env.INPUT_TARGET_LANG_CODE;
+    const targetFileInput = process.env.INPUT_TARGET_FILE;
+    const targetLangCodeInput = process.env.INPUT_TARGET_LANG_CODE;
     const apiKey = process.env.INPUT_GEMINI_API_KEY;
 
     if (!fs.existsSync(sourceFile)) {
       throw new Error(`Source file not found: ${sourceFile}`);
     }
 
-    console.log(`Translating ${sourceFile} to ${targetFile} in language ${targetLangCode}`);
+    // Parse comma-separated values
+    const targetFiles = targetFileInput.split(',').map(s => s.trim());
+    const targetLangCodes = targetLangCodeInput.split(',').map(s => s.trim());
 
+    // Validate counts match
+    if (targetFiles.length !== targetLangCodes.length) {
+      throw new Error(
+        `Mismatch: ${targetFiles.length} target file(s) but ${targetLangCodes.length} language code(s). ` +
+        `When using comma-separated values, counts must match.`
+      );
+    }
+
+    console.log(`Source file: ${sourceFile}`);
+    console.log(`Translating to ${targetFiles.length} language(s): ${targetLangCodes.join(', ')}`);
+
+    // Load and parse source ARB file once
     const arbData = JSON.parse(fs.readFileSync(sourceFile, 'utf-8'));
 
     // Extract only string values
@@ -85,45 +141,26 @@ async function run() {
 
     console.log(`Found ${originalValues.length} strings to translate.`);
 
-    // Split into batches
-    const batches = chunkArray(originalValues, BATCH_SIZE);
-    const totalBatches = batches.length;
-
-    if (totalBatches > 1) {
-      console.log(`Processing in ${totalBatches} batches of up to ${BATCH_SIZE} strings each.`);
-    }
-
-    // Translate each batch
-    const allTranslations = [];
-    for (let i = 0; i < batches.length; i++) {
-      const translatedBatch = await translateBatch(
-        batches[i],
-        targetLangCode,
+    // Translate to each target language
+    for (let i = 0; i < targetFiles.length; i++) {
+      await translateToTarget(
+        sourceFile,
+        targetFiles[i],
+        targetLangCodes[i],
         apiKey,
-        i + 1,
-        totalBatches
+        arbData,
+        originalValues,
+        originalKeys
       );
-      allTranslations.push(...translatedBatch);
 
-      // Small delay between batches to avoid rate limiting
-      if (i < batches.length - 1) {
-        await sleep(500);
+      // Delay between languages to avoid rate limiting
+      if (i < targetFiles.length - 1) {
+        console.log('\nPausing before next language...');
+        await sleep(1000);
       }
     }
 
-    console.log(`\n✓ All ${allTranslations.length} strings translated successfully!`);
-    console.log('Rebuilding ARB file with translations...');
-
-    // Rebuild ARB file
-    const newArb = { ...arbData };
-    originalKeys.forEach((key, index) => {
-      newArb[key] = allTranslations[index];
-    });
-
-    fs.writeFileSync(targetFile, JSON.stringify(newArb, null, 2));
-
-    console.log(`✓ Translated ARB created: ${targetFile}`);
-    console.log('Done translating file.');
+    console.log('\n✓ All translations completed successfully!');
   } catch (error) {
     console.error('\n✗ Translation failed:');
     console.error(error.message || error);
