@@ -19,6 +19,22 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Helper function to parse JSON, handling markdown code blocks
+function parseJsonResponse(text) {
+  let cleanedText = text.trim();
+
+  // Remove markdown code blocks if present
+  // Matches ```json\n...\n``` or ```\n...\n```
+  const codeBlockRegex = /^```(?:json)?\s*\n?([\s\S]*?)\n?```$/;
+  const match = cleanedText.match(codeBlockRegex);
+
+  if (match) {
+    cleanedText = match[1].trim();
+  }
+
+  return JSON.parse(cleanedText);
+}
+
 // Translate a batch with retry logic
 async function translateBatch(batch, targetLangCode, apiKey, batchNumber, totalBatches, retryCount = 0) {
   try {
@@ -40,9 +56,8 @@ async function translateBatch(batch, targetLangCode, apiKey, batchNumber, totalB
       }
     );
 
-    const translatedValues = JSON.parse(
-      response.data.candidates[0]?.content?.parts?.[0]?.text.trim() || '[]'
-    );
+    const responseText = response.data.candidates[0]?.content?.parts?.[0]?.text || '[]';
+    const translatedValues = parseJsonResponse(responseText);
 
     if (!Array.isArray(translatedValues) || translatedValues.length !== batch.length) {
       throw new Error(`Translation response invalid: expected ${batch.length} translations, got ${translatedValues.length}`);
@@ -99,6 +114,10 @@ async function translateToTarget(sourceFile, targetFile, targetLangCode, apiKey,
   // Rebuild ARB file
   const newArb = { ...arbData };
   originalKeys.forEach((key, index) => {
+    if (key == '@@locale') {
+      newArb[key] = targetLangCode;
+      return;
+    }
     newArb[key] = allTranslations[index];
   });
 
