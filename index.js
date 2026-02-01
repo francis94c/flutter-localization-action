@@ -38,7 +38,7 @@ function parseJsonResponse(text) {
 // Translate a batch with retry logic
 async function translateBatch(batch, targetLangCode, apiKey, batchNumber, totalBatches, retryCount = 0) {
   try {
-    console.log(`[Batch ${batchNumber}/${totalBatches}] Translating ${batch.length} strings...`);
+    console.log(`[${targetLangCode.toUpperCase()}] [Batch ${batchNumber}/${totalBatches}] Translating ${batch.length} strings...`);
 
     const response = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
@@ -63,18 +63,18 @@ async function translateBatch(batch, targetLangCode, apiKey, batchNumber, totalB
       throw new Error(`Translation response invalid: expected ${batch.length} translations, got ${translatedValues.length}`);
     }
 
-    console.log(`[Batch ${batchNumber}/${totalBatches}] ✓ Successfully translated`);
+    console.log(`[${targetLangCode.toUpperCase()}] [Batch ${batchNumber}/${totalBatches}] ✓ Successfully translated`);
     return translatedValues;
 
   } catch (error) {
     if (retryCount < MAX_RETRIES) {
       const delay = RETRY_DELAY * (retryCount + 1);
-      console.warn(`[Batch ${batchNumber}/${totalBatches}] Failed: ${error.message}`);
-      console.log(`[Batch ${batchNumber}/${totalBatches}] Retrying in ${delay / 1000}s... (Attempt ${retryCount + 1}/${MAX_RETRIES})`);
+      console.warn(`[${targetLangCode.toUpperCase()}] [Batch ${batchNumber}/${totalBatches}] Failed: ${error.message}`);
+      console.log(`[${targetLangCode.toUpperCase()}] [Batch ${batchNumber}/${totalBatches}] Retrying in ${delay / 1000}s... (Attempt ${retryCount + 1}/${MAX_RETRIES})`);
       await sleep(delay);
       return translateBatch(batch, targetLangCode, apiKey, batchNumber, totalBatches, retryCount + 1);
     } else {
-      throw new Error(`[Batch ${batchNumber}/${totalBatches}] Failed after ${MAX_RETRIES} retries: ${error.message}`);
+      throw new Error(`[${targetLangCode.toUpperCase()}] [Batch ${batchNumber}/${totalBatches}] Failed after ${MAX_RETRIES} retries: ${error.message}`);
     }
   }
 }
@@ -109,7 +109,7 @@ async function translateToTarget(sourceFile, targetFile, targetLangCode, apiKey,
     }
   }
 
-  console.log(`✓ All ${allTranslations.length} strings translated to ${targetLangCode}!`);
+  console.log(`[${targetLangCode.toUpperCase()}] ✓ All ${allTranslations.length} strings translated!`);
 
   // Rebuild ARB file
   const newArb = { ...arbData };
@@ -122,7 +122,7 @@ async function translateToTarget(sourceFile, targetFile, targetLangCode, apiKey,
   });
 
   fs.writeFileSync(targetFile, JSON.stringify(newArb, null, 2));
-  console.log(`✓ Created: ${targetFile}`);
+  console.log(`[${targetLangCode.toUpperCase()}] ✓ Created: ${targetFile}`);
 }
 
 async function run() {
@@ -131,6 +131,7 @@ async function run() {
     const targetFileInput = process.env.INPUT_TARGET_FILE;
     const targetLangCodeInput = process.env.INPUT_TARGET_LANG_CODE;
     const apiKey = process.env.INPUT_GEMINI_API_KEY;
+    const parallel = process.env.INPUT_PARALLEL === 'true';
 
     if (!fs.existsSync(sourceFile)) {
       throw new Error(`Source file not found: ${sourceFile}`);
@@ -150,6 +151,7 @@ async function run() {
 
     console.log(`Source file: ${sourceFile}`);
     console.log(`Translating to ${targetFiles.length} language(s): ${targetLangCodes.join(', ')}`);
+    console.log(`Mode: ${parallel ? 'Parallel' : 'Sequential'}`);
 
     // Load and parse source ARB file once
     const arbData = JSON.parse(fs.readFileSync(sourceFile, 'utf-8'));
@@ -160,22 +162,41 @@ async function run() {
 
     console.log(`Found ${originalValues.length} strings to translate.`);
 
-    // Translate to each target language
-    for (let i = 0; i < targetFiles.length; i++) {
-      await translateToTarget(
-        sourceFile,
-        targetFiles[i],
-        targetLangCodes[i],
-        apiKey,
-        arbData,
-        originalValues,
-        originalKeys
+    if (parallel && targetFiles.length > 1) {
+      // Parallel mode: translate all languages simultaneously
+      console.log('\n🚀 Starting parallel translation...');
+
+      const translationPromises = targetFiles.map((targetFile, i) =>
+        translateToTarget(
+          sourceFile,
+          targetFile,
+          targetLangCodes[i],
+          apiKey,
+          arbData,
+          originalValues,
+          originalKeys
+        )
       );
 
-      // Delay between languages to avoid rate limiting
-      if (i < targetFiles.length - 1) {
-        console.log('\nPausing before next language...');
-        await sleep(1000);
+      await Promise.all(translationPromises);
+    } else {
+      // Sequential mode: translate languages one by one
+      for (let i = 0; i < targetFiles.length; i++) {
+        await translateToTarget(
+          sourceFile,
+          targetFiles[i],
+          targetLangCodes[i],
+          apiKey,
+          arbData,
+          originalValues,
+          originalKeys
+        );
+
+        // Delay between languages to avoid rate limiting
+        if (i < targetFiles.length - 1) {
+          console.log('\nPausing before next language...');
+          await sleep(1000);
+        }
       }
     }
 

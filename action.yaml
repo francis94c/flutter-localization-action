@@ -17,6 +17,10 @@ inputs:
   gemini_api_key:
     description: "Gemini API key"
     required: true
+  parallel:
+    description: "Translate multiple languages in parallel (default: false)"
+    required: false
+    default: 'false'
 runs:
   using: "node20"
   main: "dist/index.js"
