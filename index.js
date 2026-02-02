@@ -131,7 +131,7 @@ async function run() {
     const targetFileInput = process.env.INPUT_TARGET_FILE;
     const targetLangCodeInput = process.env.INPUT_TARGET_LANG_CODE;
     const apiKey = process.env.INPUT_GEMINI_API_KEY;
-    const parallel = process.env.INPUT_PARALLEL == 'true';
+    const parallel = process.env.INPUT_PARALLEL === 'true';
 
     if (!fs.existsSync(sourceFile)) {
       throw new Error(`Source file not found: ${sourceFile}`);
