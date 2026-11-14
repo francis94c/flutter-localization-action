@@ -25,6 +25,10 @@ inputs:
     description: 'LLM model to use (e.g., gemini-flash-latest).'
     required: false
     default: 'gemini-3.5-flash'
+  batch_size:
+    description: 'Number of translations to process in each batch (default: 50)'
+    required: false
+    default: '50'
 runs:
   using: 'node20'
   main: 'dist/index.js'

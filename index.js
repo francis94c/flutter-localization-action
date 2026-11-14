@@ -1,7 +1,7 @@
 import fs from 'fs';
 import axios from 'axios';
 
-const BATCH_SIZE = 50; // Process 50 strings per batch
+const BATCH_SIZE = parseInt(process.env.INPUT_BATCH_SIZE || '50', 10); // Process X strings per batch
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000; // 2 seconds
 
