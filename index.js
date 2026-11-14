@@ -36,12 +36,12 @@ function parseJsonResponse(text) {
 }
 
 // Translate a batch with retry logic
-async function translateBatch(batch, targetLangCode, apiKey, batchNumber, totalBatches, retryCount = 0) {
+async function translateBatch(batch, targetLangCode, apiKey, batchNumber, totalBatches, model, retryCount = 0) {
   try {
     console.log(`[${targetLangCode.toUpperCase()}] [Batch ${batchNumber}/${totalBatches}] Translating ${batch.length} strings...`);
 
     const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
         contents: [
           {
@@ -72,7 +72,7 @@ async function translateBatch(batch, targetLangCode, apiKey, batchNumber, totalB
       console.warn(`[${targetLangCode.toUpperCase()}] [Batch ${batchNumber}/${totalBatches}] Failed: ${error.message}`);
       console.log(`[${targetLangCode.toUpperCase()}] [Batch ${batchNumber}/${totalBatches}] Retrying in ${delay / 1000}s... (Attempt ${retryCount + 1}/${MAX_RETRIES})`);
       await sleep(delay);
-      return translateBatch(batch, targetLangCode, apiKey, batchNumber, totalBatches, retryCount + 1);
+      return translateBatch(batch, targetLangCode, apiKey, batchNumber, totalBatches, model, retryCount + 1);
     } else {
       throw new Error(`[${targetLangCode.toUpperCase()}] [Batch ${batchNumber}/${totalBatches}] Failed after ${MAX_RETRIES} retries: ${error.message}`);
     }
@@ -80,7 +80,7 @@ async function translateBatch(batch, targetLangCode, apiKey, batchNumber, totalB
 }
 
 // Translate to a single target
-async function translateToTarget(sourceFile, targetFile, targetLangCode, apiKey, arbData, originalValues, originalKeys) {
+async function translateToTarget(targetFile, targetLangCode, apiKey, arbData, originalValues, originalKeys, model) {
   console.log(`\nTranslating to ${targetLangCode} → ${targetFile}`);
 
   // Split into batches
@@ -99,7 +99,8 @@ async function translateToTarget(sourceFile, targetFile, targetLangCode, apiKey,
       targetLangCode,
       apiKey,
       i + 1,
-      totalBatches
+      totalBatches,
+      model
     );
     allTranslations.push(...translatedBatch);
 
@@ -132,6 +133,7 @@ async function run() {
     const targetLangCodeInput = process.env.INPUT_TARGET_LANG_CODE;
     const apiKey = process.env.INPUT_GEMINI_API_KEY;
     const parallel = process.env.INPUT_PARALLEL === 'true';
+    const llmModel = process.env.INPUT_LLM_MODEL;
 
     if (!fs.existsSync(sourceFile)) {
       throw new Error(`Source file not found: ${sourceFile}`);
@@ -168,13 +170,13 @@ async function run() {
 
       const translationPromises = targetFiles.map((targetFile, i) =>
         translateToTarget(
-          sourceFile,
           targetFile,
           targetLangCodes[i],
           apiKey,
           arbData,
           originalValues,
-          originalKeys
+          originalKeys,
+          llmModel
         )
       );
 
@@ -183,13 +185,13 @@ async function run() {
       // Sequential mode: translate languages one by one
       for (let i = 0; i < targetFiles.length; i++) {
         await translateToTarget(
-          sourceFile,
           targetFiles[i],
           targetLangCodes[i],
           apiKey,
           arbData,
           originalValues,
-          originalKeys
+          originalKeys,
+          llmModel
         );
 
         // Delay between languages to avoid rate limiting

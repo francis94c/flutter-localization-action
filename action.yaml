@@ -1,26 +1,30 @@
-name: "Flutter Localization Action using Gemini"
-description: "Translates a Flutter ARB file to another language using Gemini API."
-author: "Francis Ilechukwu"
+name: 'Flutter Localization Action using Gemini'
+description: 'Translates a Flutter ARB file to another language using Gemini API.'
+author: 'Francis Ilechukwu'
 branding:
   icon: globe
   color: blue
 inputs:
   source_file:
-    description: "Path to the source ARB file (English)."
+    description: 'Path to the source ARB file (English).'
     required: true
   target_file:
-    description: "Path to output translated ARB file."
+    description: 'Path to output translated ARB file.'
     required: true
   target_lang_code:
-    description: "Target language code (e.g., en, es, fr)."
+    description: 'Target language code (e.g., en, es, fr).'
     required: true
   gemini_api_key:
-    description: "Gemini API key"
+    description: 'Gemini API key'
     required: true
   parallel:
-    description: "Translate multiple languages in parallel (default: false)"
+    description: 'Translate multiple languages in parallel (default: false)'
     required: false
     default: 'false'
+  llm_model:
+    description: 'LLM model to use (e.g., gemini-flash-latest).'
+    required: false
+    default: 'gemini-3.5-flash'
 runs:
-  using: "node20"
-  main: "dist/index.js"
+  using: 'node20'
+  main: 'dist/index.js'
